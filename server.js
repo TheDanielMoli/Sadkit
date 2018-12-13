@@ -12,11 +12,17 @@ const server = http.createServer((req, res) => {
     let path = parsedUrl.pathname;
     let trimmedPath = path.replace(/^\/+|\/+$/g,'');
 
+    // Get the query string as an object
+    let queryStringObject = parsedUrl.query;
+
+    // Get the headers as an object
+    let headers = req.headers;
+
     let method = req.method.toLowerCase();
 
     res.end('Sadkit: Hello, World!');
 
-    console.log('Request received on path ' + trimmedPath + ' with method ' + method);
+    console.log('Request received on path ' + trimmedPath + ' with method ' + method + ' and these query parameters:', queryStringObject);
 
 });
 
