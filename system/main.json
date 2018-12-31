@@ -1,0 +1,37 @@
+{
+  "servers": [
+    {
+      "port": "80",
+      "ssl": false
+    },
+    {
+      "port": "443",
+      "ssl": false
+    }
+  ],
+  "hosts": {
+    "localhost": {
+      "routes": {
+        "/hello": {
+          "GET": {
+            "type": "text",
+            "response": "Hello, world!"
+          },
+          "POST": {
+            "type": "json",
+            "response": {
+              "message": "Hello, world!"
+            }
+          }
+        }
+      }
+    }
+  },
+  "general": {
+    "standard": {
+      "agent": "Sadkit",
+      "version": "1.0.0",
+      "message": "This host and path has no response configured. This is the default response."
+    }
+  }
+}
