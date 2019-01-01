@@ -2,13 +2,20 @@
   "servers": [
     {
       "port": "8080",
-      "ssl": false
+      "ssl": false,
+      "listen": [
+        "localhost"
+      ]
     },
     {
       "port": "8443",
       "ssl": false
     }
   ],
+  "proxies": {
+    "80": "8080",
+    "443": "8443"
+  },
   "aliases": {
     "127.0.0.1": "localhost"
   },
