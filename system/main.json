@@ -1,17 +1,33 @@
 {
   "servers": [
     {
-      "port": "80",
+      "port": "8080",
       "ssl": false
     },
     {
-      "port": "443",
+      "port": "8443",
       "ssl": false
     }
   ],
+  "aliases": {
+    "127.0.0.1": "localhost"
+  },
   "hosts": {
     "localhost": {
+      "starts": [
+        {
+          "route": "/",
+          "method": "GET"
+        }
+      ],
       "routes": {
+        "/": {
+          "GET": {
+            "type": "static",
+            "dir": "sadkit.com",
+            "index": "index.html"
+          }
+        },
         "/hello": {
           "GET": {
             "type": "text",
@@ -32,6 +48,7 @@
       "agent": "Sadkit",
       "version": "1.0.0",
       "message": "This host and path has no response configured. This is the default response."
-    }
+    },
+    "workers": 8
   }
 }
