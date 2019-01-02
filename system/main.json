@@ -2,20 +2,38 @@
   "servers": [
     {
       "port": "8080",
-      "ssl": false,
-      "listen": [
-        "localhost"
-      ]
+      "ssl": false
     },
     {
       "port": "8443",
-      "ssl": false
+      "ssl": true
     }
   ],
-  "proxies": {
-    "80": "8080",
-    "443": "8443"
-  },
+  "proxies": [
+    {
+      "listen": 80,
+      "pass": 8080,
+      "ssl": false,
+      "hosts": {
+        "localhost": {
+          "hostname": "localhost",
+          "port": 8080
+        },
+        "127.0.0.1": {
+          "hostname": "localhost",
+          "port": 8080
+        }
+      }
+    },
+    {
+      "listen": 443,
+      "pass": 8443,
+      "ssl": {
+        "key": "key.pem",
+        "cert": "cert.pem"
+      }
+    }
+  ],
   "aliases": {
     "127.0.0.1": "localhost"
   },
@@ -48,6 +66,35 @@
           }
         }
       }
+    },
+    "127.0.0.1": {
+      "starts": [
+        {
+          "route": "/",
+          "method": "GET"
+        }
+      ],
+      "routes": {
+        "/": {
+          "GET": {
+            "type": "static",
+            "dir": "sadkit.com",
+            "index": "index.html"
+          }
+        },
+        "/hello": {
+          "GET": {
+            "type": "text",
+            "response": "Hello, world2!"
+          },
+          "POST": {
+            "type": "json",
+            "response": {
+              "message": "Hello, world!"
+            }
+          }
+        }
+      }
     }
   },
   "general": {
@@ -56,6 +103,6 @@
       "version": "1.0.0",
       "message": "This host and path has no response configured. This is the default response."
     },
-    "workers": 8
+    "workers": 2
   }
 }

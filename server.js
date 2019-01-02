@@ -28,6 +28,7 @@ if (isMaster) {
 
     const http = require('http');
     const https = require('https');
+    const httpProxy = require('http-proxy');
     const Koa = require('koa');
     const serve = require('koa-static');
     const app = new Koa();
@@ -126,14 +127,117 @@ if (isMaster) {
     if (SYSTEM.servers) {
         SYSTEM.servers.forEach(server => {
             if (server.ssl) {
-                https.createServer(app.callback()).listen(server.port, () => {
-                    console.log('Server listening on port ' + server.port);
-                });
+                try {
+                    const options = {
+                        key: fs.readFileSync(pr.key, 'utf8'),
+                        cert: fs.readFileSync(pr.cert, 'utf8')
+                    };
+                    https.createServer(options, app.callback()).listen(server.port, () => {
+                        console.log('Server listening on port ' + server.port + '. SSL enabled.');
+                    });
+                } catch (err) {
+                    http.createServer(app.callback()).listen(server.port, () => {
+                        console.log('Server listening on port ' + server.port + '. SSL disabled (certificate error).');
+                    });
+                }
             }
             else {
                 http.createServer(app.callback()).listen(server.port, () => {
-                    console.log('Server listening on port ' + server.port);
+                    console.log('Server listening on port ' + server.port + '. SSL disabled.');
                 });
+            }
+        });
+    }
+
+    if (SYSTEM.proxies) {
+        SYSTEM.proxies.forEach(pr => {
+            if (pr.ssl) {
+                let proxy;
+                try {
+                    proxy = httpProxy.createProxyServer({
+                        ssl: {
+                            key: fs.readFileSync(pr.key, 'utf8'),
+                            cert: fs.readFileSync(pr.cert, 'utf8')
+                        }
+                    });
+                } catch (err) {
+                    proxy = httpProxy.createProxyServer();
+                }
+
+                proxy.on('proxyReq', (proxyReq, req, res, options) => {
+                    proxyReq.setHeader('X-Special-Proxy-Header', req.headers.host);
+                });
+
+                http
+                    .createServer((req, res) => {
+                        // You can define here your custom logic to handle the request
+                        // and then proxy the request.
+                        let hostname = req.headers.host.split(':')[0];
+                        if (pr.hosts && pr.hosts[hostname]) {
+                            proxy.web(req, res, {
+                                target: 'http://' + pr.hosts[hostname].hostname + ':' + pr.hosts[hostname].port
+                            });
+                        }
+                        else if (pr.pass) {
+                            proxy.web(req, res, {
+                                target: 'http://' + req.headers.host.split(':')[0] + ':' + pr.pass
+                            });
+                        }
+                        else {
+                            res.setHeader('Content-Type', 'application/json');
+                            res.end(JSON.stringify({
+                                ...SYSTEM.general.standard,
+                                status: "error",
+                                message: "Proxy configuration error: no proxy configured for this protocol, hostname and port.",
+                                hostname: hostname,
+                                port: req.headers.host.split(':')[1],
+                                ssl: true,
+                                headers: req.headers
+                            }));
+                        }
+                    })
+                    .listen(pr.listen, () => {
+                        console.log('Proxying ' + pr.listen + ' to ' + pr.pass);
+                    });
+            }
+            else {
+                let proxy = httpProxy.createProxyServer({});
+
+                proxy.on('proxyReq', (proxyReq, req, res, options) => {
+                    proxyReq.setHeader('X-Special-Proxy-Header', 'foobar');
+                });
+
+                http
+                    .createServer((req, res) => {
+                        // You can define here your custom logic to handle the request
+                        // and then proxy the request.
+                        let hostname = req.headers.host.split(':')[0];
+                        if (pr.hosts && pr.hosts[hostname]) {
+                            proxy.web(req, res, {
+                                target: 'http://' + pr.hosts[hostname].hostname + ':' + pr.hosts[hostname].port
+                            });
+                        }
+                        else if (pr.pass) {
+                            proxy.web(req, res, {
+                                target: 'http://' + req.headers.host.split(':')[0] + ':' + pr.pass
+                            });
+                        }
+                        else {
+                            res.setHeader('Content-Type', 'application/json');
+                            res.end(JSON.stringify({
+                                ...SYSTEM.general.standard,
+                                status: "error",
+                                message: "Proxy configuration error: no proxy configured for this protocol, hostname and port.",
+                                hostname: hostname,
+                                port: req.headers.host.split(':')[1],
+                                ssl: false,
+                                headers: req.headers
+                            }));
+                        }
+                    })
+                    .listen(pr.listen, () => {
+                        console.log('Proxying ' + pr.listen + ' to ' + pr.pass);
+                    });
             }
         });
     }
