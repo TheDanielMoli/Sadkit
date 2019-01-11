@@ -143,5 +143,21 @@
       "message": "This host and path has no response configured. This is the default response."
     },
     "workers": 2
+  },
+  "dbms" : {
+    "active": {
+      "nedb": true,
+      "mongodb": true
+    },
+    "nedb": {
+      "databases": [
+        {
+          "name": "main",
+          "collections": [
+            "users"
+          ]
+        }
+      ]
+    }
   }
 }

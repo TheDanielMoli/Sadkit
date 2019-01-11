@@ -33,6 +33,10 @@ if (isMaster) {
     const mount = require('koa-mount');
     const send = require('koa-send');
     const Koa = require('koa');
+
+    const Datastore = SYSTEM.dbms.active["nedb"] ? require('nedb') : null;
+    let nedbs = {};
+
     const app = new Koa();
 
     // static file server middleware
@@ -287,6 +291,15 @@ if (isMaster) {
                         console.log('Proxying ' + pr.listen + ' to ' + pr.pass);
                     });
             }
+        });
+    }
+
+    if (SYSTEM.dbms.active["nedb"]) {
+        SYSTEM.dbms.nedb.databases.forEach(db => {
+            nedbs[db.name] = {};
+            db.collections.forEach(collection => {
+                nedbs[db.name][collection] = new Datastore({ filename: __dirname + '/system/nedb/' + db.name + '_' + collection + '.db', autoload: true });
+            });
         });
     }
 
