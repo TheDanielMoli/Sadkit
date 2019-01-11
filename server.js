@@ -27,26 +27,22 @@ if (isMaster) {
 } else {
 
     const http = require('http');
+    const tls = require('tls');
     const https = require('https');
     const httpProxy = require('http-proxy');
+    const mount = require('koa-mount');
     const send = require('koa-send');
     const Koa = require('koa');
     const app = new Koa();
 
     // static file server middleware
 
-    const serve = (route, opts) => {
-        opts = Object.assign({}, opts);
-
+    const serve = (opts = {}) => {
         !opts.index && (opts.index = 'index.html');
-
         return async function serve(ctx, next) {
             if (ctx.method === 'GET' || ctx.method === 'HEAD') {
                 try {
-                    let path = ctx.path.replace(route.substr(1,route.length),'');
-                    //!path.startsWith('/') && (path = '/' + path);
-                    console.log(path)
-                    !(await send(ctx, path, opts)) && await next();
+                    !(await send(ctx, ctx.path, opts)) && await next();
                 } catch (err) {
                     if (err.status !== 404) {
                         console.log(err);
@@ -75,11 +71,15 @@ if (isMaster) {
 
     // response
 
-    let respond = async (ctx, next, route, mount) => {
+    let respond = async (ctx, next, route, opts = {}) => {
         return new Promise(async resolve => {
             switch (route.type) {
                 case 'static':
-                    await serve(mount, { root: __dirname + '/www/' + route.dir })(ctx, next);
+                    if (ctx.path === opts.mount && opts.mount !== '/') {
+                        ctx.redirect(opts.mount + '/');
+                        resolve(ctx);
+                    }
+                    await mount(opts.mount, () => serve({ root: __dirname + '/www/' + route.dir })(ctx, next))(ctx, next);
                     resolve(ctx);
                     break;
                 case 'json':
@@ -118,19 +118,17 @@ if (isMaster) {
             SYSTEM.hosts[hostname].routes[ctx.request.path][ctx.request.method]
         ) {
             let route = SYSTEM.hosts[hostname].routes[ctx.request.path][ctx.request.method];
-            ctx = await respond(ctx, next, route, ctx.request.path);
+            ctx = await respond(ctx, next, route, { mount: ctx.request.path });
         } else {
             let startsWith = null;
             SYSTEM.hosts[hostname].starts.forEach(start => {
-                console.log('START LOOP', start)
                 if (ctx.request.path.startsWith(start.route) && start.method === ctx.request.method) {
-                    console.log('INSIDE LOOP', start)
-                    startsWith = start.route;
+                    startsWith ? (start.route.length > startsWith.length) && (startsWith = start.route) : startsWith = start.route;
                 }
             });
             if (startsWith) {
                 let route = SYSTEM.hosts[hostname].routes[startsWith][ctx.request.method];
-                ctx = await respond(ctx, next, route, startsWith);
+                ctx = await respond(ctx, next, route, { mount: startsWith });
             }
             else {
                 next();
@@ -156,14 +154,42 @@ if (isMaster) {
         };
     });
 
+    let secureContext = {};
+    let defaultKey = '';
+    let defaultCert = '';
+    let secureDir = __dirname + '/system/secure/';
+
+    SYSTEM.secure.forEach(domain => {
+        secureContext[domain] = tls.createSecureContext({
+            key: domain.key ? fs.readFileSync(secureDir + domain.key.path, 'utf8') : undefined,
+            cert: domain.cert ?  fs.readFileSync(secureDir + domain.cert.path, 'utf8') : undefined,
+            ca: domain.ca ? fs.readFileSync(secureDir + domain.ca.path, 'utf8') : undefined, // this ca property is optional
+        });
+        defaultKey = secureDir + domain.key.path;
+        defaultCert = secureDir + domain.cert.path;
+    });
+
+    const options = {
+        SNICallback: (domain, cb) => {
+            if (secureContext[domain]) {
+                if (cb) {
+                    cb(null, secureContext[domain]);
+                } else {
+                    // compatibility for older versions of node
+                    return secureContext[domain];
+                }
+            } else {
+                throw new Error('No keys/certificates for domain requested');
+            }
+        },
+        key: fs.readFileSync(defaultKey, 'utf8'),
+        cert: fs.readFileSync(defaultCert, 'utf8')
+    };
+
     if (SYSTEM.servers) {
         SYSTEM.servers.forEach(server => {
             if (server.ssl) {
                 try {
-                    const options = {
-                        key: fs.readFileSync(pr.key, 'utf8'),
-                        cert: fs.readFileSync(pr.cert, 'utf8')
-                    };
                     https.createServer(options, app.callback()).listen(server.port, () => {
                         console.log('Server listening on port ' + server.port + '. SSL enabled.');
                     });
@@ -184,35 +210,25 @@ if (isMaster) {
     if (SYSTEM.proxies) {
         SYSTEM.proxies.forEach(pr => {
             if (pr.ssl) {
-                let proxy;
-                try {
-                    proxy = httpProxy.createProxyServer({
-                        ssl: {
-                            key: fs.readFileSync(pr.key, 'utf8'),
-                            cert: fs.readFileSync(pr.cert, 'utf8')
-                        }
-                    });
-                } catch (err) {
-                    proxy = httpProxy.createProxyServer();
-                }
+                let proxy = new httpProxy({ changeOrigin: true });
 
                 proxy.on('proxyReq', (proxyReq, req, res, options) => {
                     proxyReq.setHeader('X-Special-Proxy-Header', req.headers.host);
                 });
 
-                http
-                    .createServer((req, res) => {
+                https
+                    .createServer(options, (req, res) => {
                         // You can define here your custom logic to handle the request
                         // and then proxy the request.
                         let hostname = req.headers.host.split(':')[0];
                         if (pr.hosts && pr.hosts[hostname]) {
                             proxy.web(req, res, {
-                                target: 'http://' + pr.hosts[hostname].hostname + ':' + pr.hosts[hostname].port
+                                target: pr.hosts[hostname].ssl ? 'https' : 'http' + '://' + pr.hosts[hostname].hostname + ':' + pr.hosts[hostname].port
                             });
                         }
                         else if (pr.pass) {
                             proxy.web(req, res, {
-                                target: 'http://' + req.headers.host.split(':')[0] + ':' + pr.pass
+                                target: pr.ssl ? 'https' : 'http' + '://' + req.headers.host.split(':')[0] + ':' + pr.pass
                             });
                         }
                         else {

@@ -17,6 +17,17 @@
       }
     }
   },
+  "secure": [
+    {
+      "domain": "127.0.0.1",
+      "key": {
+        "path": "127.0.0.1.key"
+      },
+      "cert": {
+        "path": "127.0.0.1.cert"
+      }
+    }
+  ],
   "proxies": [
     {
       "listen": 80,
@@ -36,9 +47,18 @@
     {
       "listen": 443,
       "pass": 8443,
-      "ssl": {
-        "key": "key.pem",
-        "cert": "cert.pem"
+      "ssl": true,
+      "hosts": {
+        "localhost": {
+          "hostname": "localhost",
+          "port": 8443,
+          "ssl": true
+        },
+        "127.0.0.1": {
+          "hostname": "127.0.0.1",
+          "port": 8080,
+          "ssl": false
+        }
       }
     }
   ],
@@ -51,13 +71,24 @@
         {
           "route": "/test",
           "method": "GET"
+        },
+        {
+          "route": "/",
+          "method": "GET"
         }
       ],
       "routes": {
         "/test": {
           "GET": {
             "type": "static",
-            "dir": "essence-free-opl",
+            "dir": "test/Home Property",
+            "index": "index.html"
+          }
+        },
+        "/": {
+          "GET": {
+            "type": "static",
+            "dir": "test/Home Property",
             "index": "index.html"
           }
         },
