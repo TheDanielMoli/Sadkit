@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/sadkit.iml" filepath="$PROJECT_DIR$/sadkit.iml" />
+      <module fileurl="file://$PROJECT_DIR$/Sadkit.iml" filepath="$PROJECT_DIR$/Sadkit.iml" />
     </modules>
   </component>
 </project>

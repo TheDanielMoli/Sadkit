@@ -9,6 +9,14 @@
       "ssl": true
     }
   ],
+  "redirects": {
+    "localhost": {
+      "/google": {
+        "url": "https://www.google.com/",
+        "status": 301
+      }
+    }
+  },
   "proxies": [
     {
       "listen": 80,
@@ -41,15 +49,15 @@
     "localhost": {
       "starts": [
         {
-          "route": "/",
+          "route": "/test",
           "method": "GET"
         }
       ],
       "routes": {
-        "/": {
+        "/test": {
           "GET": {
             "type": "static",
-            "dir": "sadkit.com",
+            "dir": "essence-free-opl",
             "index": "index.html"
           }
         },

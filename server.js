@@ -29,9 +29,32 @@ if (isMaster) {
     const http = require('http');
     const https = require('https');
     const httpProxy = require('http-proxy');
+    const send = require('koa-send');
     const Koa = require('koa');
-    const serve = require('koa-static');
     const app = new Koa();
+
+    // static file server middleware
+
+    const serve = (route, opts) => {
+        opts = Object.assign({}, opts);
+
+        !opts.index && (opts.index = 'index.html');
+
+        return async function serve(ctx, next) {
+            if (ctx.method === 'GET' || ctx.method === 'HEAD') {
+                try {
+                    let path = ctx.path.replace(route.substr(1,route.length),'');
+                    //!path.startsWith('/') && (path = '/' + path);
+                    console.log(path)
+                    !(await send(ctx, path, opts)) && await next();
+                } catch (err) {
+                    if (err.status !== 404) {
+                        console.log(err);
+                    }
+                }
+            }
+        }
+    };
 
     // logger
 
@@ -52,11 +75,11 @@ if (isMaster) {
 
     // response
 
-    let respond = async (ctx, next, route) => {
+    let respond = async (ctx, next, route, mount) => {
         return new Promise(async resolve => {
             switch (route.type) {
                 case 'static':
-                    await serve(__dirname + '/www/' + route.dir)(ctx, next);
+                    await serve(mount, { root: __dirname + '/www/' + route.dir })(ctx, next);
                     resolve(ctx);
                     break;
                 case 'json':
@@ -78,6 +101,13 @@ if (isMaster) {
             hostname = SYSTEM.aliases[hostname];
             ctx.request.alias = hostname;
         }
+        if (SYSTEM.redirects[hostname]) {
+            if (SYSTEM.redirects[hostname][ctx.request.path]) {
+                ctx.status = SYSTEM.redirects[hostname][ctx.request.path].status;
+                ctx.redirect(SYSTEM.redirects[hostname][ctx.request.path].url);
+                return;
+            }
+        }
         if (
             SYSTEM.hosts[hostname]
             &&
@@ -88,17 +118,19 @@ if (isMaster) {
             SYSTEM.hosts[hostname].routes[ctx.request.path][ctx.request.method]
         ) {
             let route = SYSTEM.hosts[hostname].routes[ctx.request.path][ctx.request.method];
-            ctx = await respond(ctx, next, route);
+            ctx = await respond(ctx, next, route, ctx.request.path);
         } else {
             let startsWith = null;
             SYSTEM.hosts[hostname].starts.forEach(start => {
+                console.log('START LOOP', start)
                 if (ctx.request.path.startsWith(start.route) && start.method === ctx.request.method) {
+                    console.log('INSIDE LOOP', start)
                     startsWith = start.route;
                 }
             });
             if (startsWith) {
                 let route = SYSTEM.hosts[hostname].routes[startsWith][ctx.request.method];
-                ctx = await respond(ctx, next, route);
+                ctx = await respond(ctx, next, route, startsWith);
             }
             else {
                 next();
