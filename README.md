@@ -7,7 +7,7 @@
   <img src="https://www.sadkit.com/assets/img/logo.png" alt="Sadkit Logo" width="200px" height="200px" />
 </p>
 
-Sadkit is a Node.js clustered web server with zero code needed. Just configuration files!
+<span align="center">Sadkit is a Node.js clustered web server with zero code needed. Just configuration files!</span>
 
 ## Getting Started
 
