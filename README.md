@@ -3,6 +3,10 @@
 [npm-image]: https://img.shields.io/npm/v/sadkit.svg
 [npm-url]: https://www.npmjs.com/package/sadkit
 
+<p align="center">
+  <img src="https://www.sadkit.com/assets/img/logo.png" alt="Sadkit Logo" width="200px" height="200px" />
+</p>
+
 Sadkit is a Node.js clustered web server with zero code needed. Just configuration files!
 
 ## Getting Started
