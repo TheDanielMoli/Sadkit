@@ -69,26 +69,15 @@
     "localhost": {
       "starts": [
         {
-          "route": "/test",
-          "method": "GET"
-        },
-        {
           "route": "/",
           "method": "GET"
         }
       ],
       "routes": {
-        "/test": {
-          "GET": {
-            "type": "static",
-            "dir": "test/Home Property",
-            "index": "index.html"
-          }
-        },
         "/": {
           "GET": {
             "type": "static",
-            "dir": "test/Home Property",
+            "dir": "localhost",
             "index": "index.html"
           }
         },
