@@ -1,0 +1,8 @@
+{
+  "standard": {
+    "agent": "Sadkit",
+    "version": "1.0.0",
+    "message": "This host and path has no response configured. This is the default response."
+  },
+  "workers": 2
+}

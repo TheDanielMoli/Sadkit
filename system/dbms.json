@@ -1,0 +1,25 @@
+{
+  "active": {
+    "nedb": true,
+    "mongodb": true
+  },
+  "nedb": {
+    "databases": [
+      {
+        "name": "main",
+        "collections": [
+          "users"
+        ]
+      },
+      {
+        "name": "test",
+        "collections": [
+          "dog"
+        ]
+      }
+    ]
+  },
+  "mongodb": {
+    "url": "mongodb://localhost:27017"
+  }
+}

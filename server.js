@@ -1,6 +1,14 @@
 const fs = require('fs');
 
-let SYSTEM = JSON.parse(fs.readFileSync('./system/main.json', 'utf8'));
+let SYSTEM = {};
+SYSTEM.aliases = JSON.parse(fs.readFileSync('./system/aliases.json', 'utf8'));
+SYSTEM.dbms = JSON.parse(fs.readFileSync('./system/dbms.json', 'utf8'));
+SYSTEM.general = JSON.parse(fs.readFileSync('./system/general.json', 'utf8'));
+SYSTEM.hosts = JSON.parse(fs.readFileSync('./system/hosts.json', 'utf8'));
+SYSTEM.proxies = JSON.parse(fs.readFileSync('./system/proxies.json', 'utf8'));
+SYSTEM.redirects = JSON.parse(fs.readFileSync('./system/redirects.json', 'utf8'));
+SYSTEM.secure = JSON.parse(fs.readFileSync('./system/secure.json', 'utf8'));
+SYSTEM.servers = JSON.parse(fs.readFileSync('./system/servers.json', 'utf8'));
 
 const cluster = require('cluster');
 const isMaster = cluster.isMaster;
@@ -32,12 +40,21 @@ if (isMaster) {
     const httpProxy = require('http-proxy');
     const mount = require('koa-mount');
     const send = require('koa-send');
+    const formidable = require('koa2-formidable');
+    const compress = require('koa-compress');
     const Koa = require('koa');
+
+    const MongoClient = SYSTEM.dbms.active["mongodb"] ? require('mongodb').MongoClient : null;
+    let mongoClient;
 
     const Datastore = SYSTEM.dbms.active["nedb"] ? require('nedb') : null;
     let nedbs = {};
 
     const app = new Koa();
+
+    app.use(formidable());
+
+    app.use(compress());
 
     // static file server middleware
 
@@ -52,6 +69,282 @@ if (isMaster) {
                         console.log(err);
                     }
                 }
+            }
+        }
+    };
+
+    // mongodb database middleware
+
+    const mongodb = (opts = {}) => {
+        !opts.db && (opts.db = 'main');
+        return async function mongodb(ctx, next) {
+            let response = {
+                agent: "Sadkit",
+                db: opts.db,
+                collection: opts.collection
+            };
+            const db = mongoClient.db(opts.db);
+            const collection = db.collection(opts.collection);
+            switch (opts.op) {
+                case 'find':
+                    await new Promise(resolve => {
+                        let options = ctx.request.body;
+                        !options && (options = {});
+                        collection.find(options).toArray((err, docs) => {
+                            if (err)
+                                ctx.body = err;
+                            else
+                                ctx.body = {
+                                    ...response,
+                                    status: "success",
+                                    op: "find",
+                                    docs: docs
+                                };
+                            resolve(ctx);
+                        });
+                    });
+                    break;
+                case 'find-one':
+                    await new Promise(resolve => {
+                        let options = ctx.request.body;
+                        !options && (options = {});
+                        collection.findOne(options).toArray((err, docs) => {
+                            if (err)
+                                ctx.body = err;
+                            else
+                                ctx.body = {
+                                    ...response,
+                                    status: "success",
+                                    op: "find-one",
+                                    docs: docs
+                                };
+                            resolve(ctx);
+                        });
+                    });
+                    break;
+                case 'insert':
+                    await new Promise(resolve => {
+                        let doc = ctx.request.body;
+                        !doc && (doc = {});
+                        collection.insertOne(doc, (err, newDoc) => {
+                            if (err)
+                                ctx.body = err;
+                            else
+                                ctx.body = {
+                                    ...response,
+                                    status: "success",
+                                    op: "insert",
+                                    doc: newDoc
+                                };
+                            resolve(ctx);
+                        });
+                    });
+                    break;
+                case 'update':
+                    await new Promise(resolve => {
+                        let options = ctx.request.body;
+                        !options && (options = {});
+                        !options.query && (options.query = {});
+                        !options.values && (options.values = {});
+                        collection.updateMany(options.query, { $set: options.values }, (err, numReplaced) => {
+                            if (err)
+                                ctx.body = err;
+                            else
+                                ctx.body = {
+                                    ...response,
+                                    status: "success",
+                                    op: "update",
+                                    nUpdated: numReplaced
+                                };
+                            resolve(ctx);
+                        });
+                    });
+                    break;
+                case 'remove':
+                    await new Promise(resolve => {
+                        let options = ctx.request.body;
+                        !options && (options = {});
+                        collection.deleteMany(options, (err, numRemoved) => {
+                            if (err)
+                                ctx.body = err;
+                            else
+                                ctx.body = {
+                                    ...response,
+                                    status: "success",
+                                    op: "remove",
+                                    nRemoved: numRemoved
+                                };
+                            resolve(ctx);
+                        });
+                    });
+                    break;
+                case 'remove-one':
+                    await new Promise(resolve => {
+                        let options = ctx.request.body;
+                        !options && (options = {});
+                        !options.id && options._id && (options.id = options._id);
+                        if (!options.id) {
+                            ctx.body = {
+                                ...response,
+                                status: "error",
+                                op: "remove-one",
+                                error: "You must provide an id of the element to remove. Request payload must be a field id or _id."
+                            };
+                            resolve(ctx);
+                        }
+                        collection.deleteOne({ _id: options.id }, {}, (err, numRemoved) => {
+                            if (err)
+                                ctx.body = err;
+                            else
+                                ctx.body = {
+                                    ...response,
+                                    status: "success",
+                                    op: "remove-one",
+                                    nRemoved: numRemoved
+                                };
+                            resolve(ctx);
+                        });
+                    });
+                    break;
+                default:
+                    ctx.body = 'No op configured for this storage route.';
+            }
+        }
+    };
+
+    // nedb database middleware
+
+    const nedb = (opts = {}) => {
+        !opts.db && (opts.db = 'main');
+        return async function nedb(ctx, next) {
+            let response = {
+                agent: "Sadkit",
+                db: opts.db,
+                collection: opts.collection
+            };
+            switch(opts.op) {
+                case 'find':
+                    await new Promise(resolve => {
+                        let options = ctx.request.body;
+                        !options && (options = {});
+                        nedbs[opts.db][opts.collection].find(options, (err, docs) => {
+                            if (err)
+                                ctx.body = err;
+                            else
+                                ctx.body = {
+                                    ...response,
+                                    status: "success",
+                                    op: "find-one",
+                                    docs: docs
+                                };
+                            resolve(ctx);
+                        });
+                    });
+                    break;
+                case 'find-one':
+                    await new Promise(resolve => {
+                        let options = ctx.request.body;
+                        !options && (options = {});
+                        nedbs[opts.db][opts.collection].findOne(options, (err, docs) => {
+                            if (err)
+                                ctx.body = err;
+                            else
+                                ctx.body = {
+                                    ...response,
+                                    status: "success",
+                                    op: "find-one",
+                                    doc: docs
+                                };
+                            resolve(ctx);
+                        });
+                    });
+                    break;
+                case 'insert':
+                    await new Promise(resolve => {
+                        let doc = ctx.request.body;
+                        !doc && (doc = {});
+                        nedbs[opts.db][opts.collection].insert(doc, (err, newDoc) => {
+                            if (err)
+                                ctx.body = err;
+                            else
+                                ctx.body = {
+                                    ...response,
+                                    status: "success",
+                                    op: "insert",
+                                    doc: newDoc
+                                };
+                            resolve(ctx);
+                        });
+                    });
+                    break;
+                case 'update':
+                    await new Promise(resolve => {
+                        let options = ctx.request.body;
+                        !options && (options = {});
+                        !options.query && (options.query = {});
+                        !options.values && (options.values = {});
+                        nedbs[opts.db][opts.collection].update(options.query, { $set: options.values }, { multi: true }, (err, numReplaced) => {
+                            if (err)
+                                ctx.body = err;
+                            else
+                                ctx.body = {
+                                    ...response,
+                                    status: "success",
+                                    op: "update",
+                                    nUpdated: numReplaced
+                                };
+                            resolve(ctx);
+                        });
+                    });
+                    break;
+                case 'remove':
+                    await new Promise(resolve => {
+                        let options = ctx.request.body;
+                        !options && (options = {});
+                        nedbs[opts.db][opts.collection].remove(options, { multi: true }, (err, numRemoved) => {
+                            if (err)
+                                ctx.body = err;
+                            else
+                                ctx.body = {
+                                    ...response,
+                                    status: "success",
+                                    op: "remove",
+                                    nRemoved: numRemoved
+                                };
+                            resolve(ctx);
+                        });
+                    });
+                    break;
+                case 'remove-one':
+                    await new Promise(resolve => {
+                        let options = ctx.request.body;
+                        !options && (options = {});
+                        !options.id && options._id && (options.id = options._id);
+                        if (!options.id) {
+                            ctx.body = {
+                                ...response,
+                                status: "error",
+                                op: "remove-one",
+                                error: "You must provide an id of the element to remove. Request payload must be a field id or _id."
+                            };
+                            resolve(ctx);
+                        }
+                        nedbs[opts.db][opts.collection].remove({ _id: options.id }, {}, (err, numRemoved) => {
+                            if (err)
+                                ctx.body = err;
+                            else
+                                ctx.body = {
+                                    ...response,
+                                    status: "success",
+                                    op: "remove-one",
+                                    nRemoved: numRemoved
+                                };
+                            resolve(ctx);
+                        });
+                    });
+                    break;
+                default:
+                    ctx.body = 'No op configured for this storage route.';
             }
         }
     };
@@ -78,10 +371,26 @@ if (isMaster) {
     let respond = async (ctx, next, route, opts = {}) => {
         return new Promise(async resolve => {
             switch (route.type) {
+                case 'storage':
+                    switch(route.dbms) {
+                        case 'mongodb':
+                            await mongodb(route.config)(ctx, next);
+                            break;
+                        case 'nedb':
+                        default:
+                            await nedb(route.config)(ctx, next);
+                    }
+                    resolve(ctx);
+                    break;
                 case 'static':
                     if (ctx.path === opts.mount && opts.mount !== '/') {
                         ctx.redirect(opts.mount + '/');
                         resolve(ctx);
+                    }
+                    if (!fs.existsSync(__dirname + '/www/' + route.dir + '/' + ctx.path.replace(opts.mount, ''))) {
+                        await next();
+                        resolve(ctx);
+                        break;
                     }
                     await mount(opts.mount, () => serve({ root: __dirname + '/www/' + route.dir })(ctx, next))(ctx, next);
                     resolve(ctx);
@@ -303,4 +612,11 @@ if (isMaster) {
         });
     }
 
+    if (SYSTEM.dbms.active["mongodb"]) {
+        MongoClient.connect(SYSTEM.dbms.mongodb.url, { useNewUrlParser: true },(err, client) => {
+            console.log("Connected successfully to MongoDB");
+            mongoClient = client;
+            // client.close();
+        });
+    }
 }

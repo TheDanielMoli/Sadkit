@@ -1,0 +1,8 @@
+{
+  "localhost": {
+    "/google": {
+      "url": "https://www.google.com/",
+      "status": 301
+    }
+  }
+}

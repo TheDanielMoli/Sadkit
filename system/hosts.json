@@ -1,0 +1,187 @@
+{
+  "localhost": {
+    "starts": [
+      {
+        "route": "/",
+        "method": "GET"
+      },
+      {
+        "route": "/test",
+        "method": "GET"
+      }
+    ],
+    "routes": {
+      "/": {
+        "GET": {
+          "type": "static",
+          "dir": "localhost",
+          "index": "index.html"
+        }
+      },
+      "/Dog": {
+        "GET": {
+          "type": "storage",
+          "config": {
+            "db": "test",
+            "collection": "dog",
+            "op": "find"
+          }
+        },
+        "POST": {
+          "type": "storage",
+          "config": {
+            "db": "test",
+            "collection": "dog",
+            "op": "find"
+          }
+        },
+        "PUT": {
+          "type": "storage",
+          "config": {
+            "db": "test",
+            "collection": "dog",
+            "op": "update"
+          }
+        },
+        "DELETE": {
+          "type": "storage",
+          "config": {
+            "db": "test",
+            "collection": "dog",
+            "op": "remove"
+          }
+        }
+      },
+      "/Dog/new": {
+        "POST": {
+          "type": "storage",
+          "config": {
+            "db": "test",
+            "collection": "dog",
+            "op": "insert"
+          }
+        }
+      },
+      "/Dog/one": {
+        "POST": {
+          "type": "storage",
+          "config": {
+            "db": "test",
+            "collection": "dog",
+            "op": "find-one"
+          }
+        }
+      },
+
+      "/Person": {
+        "GET": {
+          "type": "storage",
+          "dbms": "mongodb",
+          "config": {
+            "db": "testdb",
+            "collection": "Person",
+            "op": "find"
+          }
+        },
+        "POST": {
+          "type": "storage",
+          "dbms": "mongodb",
+          "config": {
+            "db": "testdb",
+            "collection": "Person",
+            "op": "find"
+          }
+        },
+        "PUT": {
+          "type": "storage",
+          "dbms": "mongodb",
+          "config": {
+            "db": "testdb",
+            "collection": "Person",
+            "op": "update"
+          }
+        },
+        "DELETE": {
+          "type": "storage",
+          "dbms": "mongodb",
+          "config": {
+            "db": "testdb",
+            "collection": "Person",
+            "op": "remove"
+          }
+        }
+      },
+      "/Person/new": {
+        "POST": {
+          "type": "storage",
+          "dbms": "mongodb",
+          "config": {
+            "db": "testdb",
+            "collection": "Person",
+            "op": "insert"
+          }
+        }
+      },
+      "/Person/one": {
+        "POST": {
+          "type": "storage",
+          "dbms": "mongodb",
+          "config": {
+            "db": "testdb",
+            "collection": "Person",
+            "op": "find-one"
+          }
+        }
+      },
+
+      "/test": {
+        "GET": {
+          "type": "static",
+          "dir": "test/Home Property",
+          "index": "index.html"
+        }
+      },
+      "/hello": {
+        "GET": {
+          "type": "text",
+          "response": "Hello, world!"
+        },
+        "POST": {
+          "type": "json",
+          "response": {
+            "message": "Hello, world!"
+          }
+        }
+      }
+    }
+  },
+  "127.0.0.1": {
+    "starts": [
+      {
+        "route": "/",
+        "method": "GET"
+      }
+    ],
+    "routes": {
+      "/": {
+        "GET": {
+          "type": "static",
+          "dir": "sadkit.com",
+          "index": "index.html"
+        }
+      },
+      "/hello": {
+        "GET": {
+          "type": "text",
+          "response": "Hello, world2!"
+        },
+        "POST": {
+          "type": "json",
+          "response": {
+            "message": "Hello, world!"
+          }
+        }
+      }
+    }
+  }
+}
