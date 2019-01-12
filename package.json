@@ -1,7 +1,7 @@
 {
   "name": "sadkit",
   "version": "1.0.0",
-  "description": "",
+  "description": "Sadkit is a Node.js clustered web server with zero code needed. Just configuration files!",
   "main": "server.js",
   "dependencies": {
     "http-proxy": "^1.17.0",
@@ -15,15 +15,14 @@
   },
   "devDependencies": {},
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Sadkit/sadkit.git"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Daniele Molinari",
+  "license": "Apache License 2.0",
   "bugs": {
     "url": "https://github.com/Sadkit/sadkit/issues"
   },
