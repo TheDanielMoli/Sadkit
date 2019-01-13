@@ -134,6 +134,35 @@
         }
       },
 
+      "/jwt/login": {
+        "POST": {
+          "type": "login",
+          "role": "admin"
+        }
+      },
+      "/jwt/register": {
+        "POST": {
+          "type": "register",
+          "role": "admin"
+        }
+      },
+      "/jwt/protected": {
+        "GET": {
+          "type": "text",
+          "protected": true,
+          "roles": ["admin"],
+          "response": "hello, protected world"
+        }
+      },
+      "/jwt/protected-two": {
+        "GET": {
+          "type": "text",
+          "protected": true,
+          "roles": ["operator"],
+          "response": "hello, protected world"
+        }
+      },
+
       "/test": {
         "GET": {
           "type": "static",

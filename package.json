@@ -1,17 +1,21 @@
 {
   "name": "sadkit",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Sadkit is a Node.js clustered web server with zero code needed. Just configuration files!",
   "main": "server.js",
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "http-proxy": "^1.17.0",
+    "jsonwebtoken": "^8.4.0",
     "koa": "^2.6.2",
     "koa-compress": "^3.0.0",
     "koa-mount": "^4.0.0",
+    "koa-passport": "^4.1.1",
     "koa-send": "^5.0.0",
     "koa2-formidable": "^1.0.2",
     "mongodb": "^3.1.10",
-    "nedb": "^1.8.0"
+    "nedb": "^1.8.0",
+    "passport-jwt": "^4.0.0"
   },
   "devDependencies": {},
   "scripts": {

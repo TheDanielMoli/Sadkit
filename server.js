@@ -2,6 +2,7 @@ const fs = require('fs');
 
 let SYSTEM = {};
 SYSTEM.aliases = JSON.parse(fs.readFileSync('./system/aliases.json', 'utf8'));
+SYSTEM.auth = JSON.parse(fs.readFileSync('./system/auth.json', 'utf8'));
 SYSTEM.dbms = JSON.parse(fs.readFileSync('./system/dbms.json', 'utf8'));
 SYSTEM.general = JSON.parse(fs.readFileSync('./system/general.json', 'utf8'));
 SYSTEM.hosts = JSON.parse(fs.readFileSync('./system/hosts.json', 'utf8'));
@@ -9,6 +10,10 @@ SYSTEM.proxies = JSON.parse(fs.readFileSync('./system/proxies.json', 'utf8'));
 SYSTEM.redirects = JSON.parse(fs.readFileSync('./system/redirects.json', 'utf8'));
 SYSTEM.secure = JSON.parse(fs.readFileSync('./system/secure.json', 'utf8'));
 SYSTEM.servers = JSON.parse(fs.readFileSync('./system/servers.json', 'utf8'));
+
+let packageJSON = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
+if (SYSTEM.general.standard)
+    SYSTEM.general.standard.version = packageJSON.version;
 
 const cluster = require('cluster');
 const isMaster = cluster.isMaster;
@@ -42,6 +47,11 @@ if (isMaster) {
     const send = require('koa-send');
     const formidable = require('koa2-formidable');
     const compress = require('koa-compress');
+    const passport = require('koa-passport');
+    const bcrypt = require('bcryptjs');
+    const jwt = require('jsonwebtoken');
+    const JwtStrategy = require('passport-jwt').Strategy;
+    const ExtractJwt = require('passport-jwt').ExtractJwt;
     const Koa = require('koa');
 
     const MongoClient = SYSTEM.dbms.active["mongodb"] ? require('mongodb').MongoClient : null;
@@ -55,6 +65,56 @@ if (isMaster) {
     app.use(formidable());
 
     app.use(compress());
+
+    app.use(passport.initialize());
+
+    // Passport authentication strategy
+
+    const opts = {};
+    opts.jwtFromRequest = ExtractJwt.fromAuthHeaderAsBearerToken();
+    // TODO set secret key
+    opts.secretOrKey = 'secret';
+
+    passport.use(new JwtStrategy(opts, (jwt_payload, done) => {
+        switch (SYSTEM.auth.db.type) {
+            case 'mongodb':
+                const db = mongoClient.db(SYSTEM.auth.db.name);
+                const collection = db.collection(jwt_payload.role);
+                collection.findOne({_id: jwt_payload.id}).toArray((err, user) => {
+                    if (err)
+                        return done(null, false);
+                    else
+                        if (user) {
+                            return done(null, {
+                                _id: user._id,
+                                username: user.username,
+                                role: jwt_payload.role
+                            });
+                        }
+                        else {
+                            return done(null, false);
+                        }
+                });
+                break;
+            case 'nedb':
+            default:
+                nedbs[SYSTEM.auth.db.name][jwt_payload.role].findOne({_id: jwt_payload.id}, (err, user) => {
+                    if (err)
+                        return done(null, false);
+                    else
+                        if (user) {
+                            return done(null, {
+                                _id: user._id,
+                                username: user.username,
+                                role: jwt_payload.role
+                            });
+                        }
+                        else {
+                            return done(null, false);
+                        }
+                });
+        }
+    }));
 
     // static file server middleware
 
@@ -234,7 +294,7 @@ if (isMaster) {
                                 ctx.body = {
                                     ...response,
                                     status: "success",
-                                    op: "find-one",
+                                    op: "find",
                                     docs: docs
                                 };
                             resolve(ctx);
@@ -370,7 +430,177 @@ if (isMaster) {
 
     let respond = async (ctx, next, route, opts = {}) => {
         return new Promise(async resolve => {
+            route.protected && await passport.authenticate("jwt", { session: false })(ctx, next);
+
+            if (ctx.status === 401) {
+                ctx.body = {
+                    status: "unauthorized",
+                    body: "You need to login in first."
+                };
+                resolve(ctx);
+                return;
+            }
+
+            if (route.protected && !route.roles.includes(ctx.state.user.role)) {
+                ctx.body = {
+                    status: "unauthorized",
+                    body: "Your user group is not authorized to view this content."
+                };
+                resolve(ctx);
+                return;
+            }
+
             switch (route.type) {
+                case 'register':
+                    const newUsername = ctx.request.body.username;
+                    const newPsw = ctx.request.body.password;
+                    switch (SYSTEM.auth.db.type) {
+                        case 'mongodb':
+                        case 'nedb':
+                        default:
+                            nedbs[SYSTEM.auth.db.name][route.role].findOne({ username: newUsername }, (err, user) => {
+                                    if (user) {
+                                        ctx.status = {
+                                            status: "error",
+                                            error: "Username is already taken."
+                                        };
+                                        resolve(ctx);
+                                    }
+                                    else {
+                                        const newUser = {
+                                            username: newUsername,
+                                            password: newPsw
+                                        };
+
+                                        bcrypt.genSalt(10, (err, salt) => {
+                                            bcrypt.hash(newUser.password, salt, (err, hash) => {
+                                                if (err) throw err;
+                                                newUser.password = hash;
+                                                nedbs[SYSTEM.auth.db.name][route.role].insert(newUser, (err, user) => {
+                                                    if (err)
+                                                        ctx.status = {
+                                                            status: "error",
+                                                            error: "Error while inserting user in db."
+                                                        };
+                                                    resolve(ctx);
+                                                    ctx.body = user;
+                                                    resolve(ctx);
+                                                })
+                                            });
+                                        });
+                                    }
+                                });
+                    }
+                    break;
+                case 'login':
+                    const username = ctx.request.body.username;
+                    const password = ctx.request.body.password;
+                    switch (SYSTEM.auth.db.type) {
+                        case 'mongodb':
+                            const db = mongoClient.db(SYSTEM.auth.db.name);
+                            const collection = db.collection(route.role);
+                            collection.findOne({username})
+                                .then((user) => {
+                                    // Check for user
+                                    if (!user) {
+                                        ctx.body = {
+                                            status: "error",
+                                            error: "Username not found."
+                                        };
+                                        resolve(ctx);
+                                        return;
+                                    }
+
+                                    // Check Password
+                                    bcrypt
+                                        .compare(password, user.password)
+                                        .then(isMatch => {
+                                            if (isMatch) {
+                                                // User Matched
+
+                                                // Create JWT Payload
+                                                const payload = {
+                                                    id: user.id,
+                                                    username: user.username,
+                                                    role: route.role
+                                                };
+
+                                                // Sign Token
+                                                jwt.sign(
+                                                    payload,
+                                                    'secret',
+                                                    { expiresIn: 3600 },
+                                                    (err, token) => {
+                                                        ctx.body = {
+                                                            success: true,
+                                                            token: 'Bearer ' + token
+                                                        };
+                                                        resolve(ctx);
+                                                    }
+                                                );
+                                            }
+                                            else {
+                                                ctx.body = {
+                                                    status: "error",
+                                                    error: "Incorrect password."
+                                                };
+                                                resolve(ctx);
+                                            }
+                                        })
+                                });
+                            break;
+                        case 'nedb':
+                        default:
+                            nedbs[SYSTEM.auth.db.name][route.role].findOne({username}, (err, user) => {
+                                    // Check for user
+                                    if (!user) {
+                                        ctx.body = {
+                                            status: "error",
+                                            error: "Username not found."
+                                        };
+                                        resolve(ctx);
+                                        return;
+                                    }
+
+                                    // Check Password
+                                    bcrypt
+                                        .compare(password, user.password)
+                                        .then(isMatch => {
+                                            if (isMatch) {
+                                                // User Matched
+
+                                                // Create JWT Payload
+                                                const payload = {
+                                                    id: user._id,
+                                                    username: user.username,
+                                                    role: route.role
+                                                };
+
+                                                // Sign Token
+                                                jwt.sign(
+                                                    payload,
+                                                    'secret',
+                                                    { expiresIn: 3600 },
+                                                    (err, token) => {
+                                                        ctx.body = {
+                                                            success: true,
+                                                            token: 'Bearer ' + token
+                                                        };
+                                                        resolve(ctx);
+                                                    }
+                                                );
+                                            }
+                                            else {
+                                                ctx.body = {
+                                                    status: "error",
+                                                    error: "Incorrect password."
+                                                };
+                                                resolve(ctx);
+                                            }
+                                        })
+                                });
+                    }
+                    break;
                 case 'storage':
                     switch(route.dbms) {
                         case 'mongodb':
@@ -610,11 +840,18 @@ if (isMaster) {
                 nedbs[db.name][collection] = new Datastore({ filename: __dirname + '/system/nedb/' + db.name + '_' + collection + '.db', autoload: true });
             });
         });
+        nedbs[SYSTEM.auth.db.name] = {};
+        SYSTEM.auth.roles.forEach(role => {
+            nedbs[SYSTEM.auth.db.name][role.name] = new Datastore({ filename: __dirname + '/system/nedb/' + SYSTEM.auth.db.name + '_' + role.name + '.db', autoload: true });
+        });
     }
 
     if (SYSTEM.dbms.active["mongodb"]) {
         MongoClient.connect(SYSTEM.dbms.mongodb.url, { useNewUrlParser: true },(err, client) => {
-            console.log("Connected successfully to MongoDB");
+            if (err)
+                console.log("Error in MongoDB connection.");
+            else
+                console.log("Connected successfully to MongoDB");
             mongoClient = client;
             // client.close();
         });

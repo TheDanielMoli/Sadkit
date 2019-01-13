@@ -1,7 +1,7 @@
 {
   "active": {
     "nedb": true,
-    "mongodb": true
+    "mongodb": false
   },
   "nedb": {
     "databases": [
