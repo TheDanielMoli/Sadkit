@@ -1,6 +1,6 @@
 {
   "name": "sadkit",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Sadkit is a Node.js clustered web server with zero code needed. Just configuration files!",
   "main": "server.js",
   "dependencies": {

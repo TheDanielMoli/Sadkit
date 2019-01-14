@@ -456,6 +456,41 @@ if (isMaster) {
                     const newPsw = ctx.request.body.password;
                     switch (SYSTEM.auth.db.type) {
                         case 'mongodb':
+                            const db = mongoClient.db(SYSTEM.auth.db.name);
+                            const collection = db.collection(route.role);
+                            collection.findOne({ username: newUsername }, (err, user) => {
+                                if (user) {
+                                    ctx.status = {
+                                        status: "error",
+                                        error: "Username is already taken."
+                                    };
+                                    resolve(ctx);
+                                }
+                                else {
+                                    const newUser = {
+                                        username: newUsername,
+                                        password: newPsw
+                                    };
+
+                                    bcrypt.genSalt(10, (err, salt) => {
+                                        bcrypt.hash(newUser.password, salt, (err, hash) => {
+                                            if (err) throw err;
+                                            newUser.password = hash;
+                                            collection.insertOne(newUser, (err, user) => {
+                                                if (err)
+                                                    ctx.status = {
+                                                        status: "error",
+                                                        error: "Error while inserting user in db."
+                                                    };
+                                                resolve(ctx);
+                                                ctx.body = user;
+                                                resolve(ctx);
+                                            })
+                                        });
+                                    });
+                                }
+                            });
+                            break;
                         case 'nedb':
                         default:
                             nedbs[SYSTEM.auth.db.name][route.role].findOne({ username: newUsername }, (err, user) => {
